@@ -3,10 +3,8 @@ from langchain.prompts import PromptTemplate
 from langchain_openai import OpenAI
 from dotenv import load_dotenv
 
-# Load API key from .env
 load_dotenv()
 
-# Initialize OpenAI model
 llm = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 # Define a structured PromptTemplate
