@@ -1,42 +1,48 @@
 import os
-from langchain.prompts import PromptTemplate
-from langchain.chains import LLMChain, SimpleSequentialChain
+from langsmith import Client
+from langchain_core.prompts import ChatPromptTemplate, PromptTemplate
 from langchain_openai import OpenAI
+from langchain_core.runnables import RunnableLambda, RunnablePassthrough
 from dotenv import load_dotenv
 
 # Load API key
 load_dotenv()
 llm = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
+# Connect to LangSmith client
+client = Client()
+
 # Step 1: Generate a fun fact about a topic
 fact_prompt = PromptTemplate(
     input_variables=["topic"],
-    template="Tell me a one sentence fact about {topic}."
+    template="Tell me a one-sentence fact about {topic}."
 )
-fact_chain = LLMChain(llm=llm, prompt=fact_prompt)
+client.push_prompt("fun-fact-prompt", object=fact_prompt)
+fact_chain = fact_prompt | llm
 
 # Step 2: Turn that fact into a poem
 rhyme_prompt = PromptTemplate(
     input_variables=["fact"],
-    template="Turn this fact into a 8 line poem: {fact}"
+    template="Turn this fact into an 8-line poem: {fact}"
 )
-rhyme_chain = LLMChain(llm=llm, prompt=rhyme_prompt)
+client.push_prompt("poem-prompt", object=rhyme_prompt)
+rhyme_chain = rhyme_prompt | llm
 
-# Step 3: Title the poem
+# Step 3: Title the poem humorously
 title_prompt = PromptTemplate(
     input_variables=["rhyme"],
     template="Title this poem humorously using a pun: {rhyme}"
 )
-title_chain = LLMChain(llm=llm, prompt=title_prompt)
+client.push_prompt("title-prompt", object=title_prompt)
+title_chain = title_prompt | llm
 
-# Combine all chains into a sequence
-chain = SimpleSequentialChain(chains=[fact_chain, rhyme_chain, title_chain], verbose=True)
+# Combine chains sequentially
+chain = fact_chain | RunnableLambda(lambda fact: print("\nFun Fact:", fact) or {"fact": fact}) \
+       | rhyme_chain | RunnableLambda(lambda rhyme: print("\nPoem:", rhyme) or {"rhyme": rhyme}) \
+       | title_chain | RunnableLambda(lambda title: print("\nFinal Title:", title) or title)
 
 # Get user input
 user_input = input("Enter a topic: ")
 
 # Run the chain
-output = chain.run(user_input)
-
-# Print the final summary
-print("\nFinal title:", output)
+output = chain.invoke({"topic": user_input})
